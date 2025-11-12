@@ -1,308 +1,319 @@
 package com.mycompany.proyectodashboard;
 
+import java.awt.CardLayout;
+import java.awt.BorderLayout;
+import java.util.List;
 import javax.swing.*;
-import java.awt.*;
+import javax.swing.table.DefaultTableModel;
 import javax.swing.border.EmptyBorder;
-import javax.swing.border.TitledBorder;
+import java.awt.Font;
+import java.awt.Color;
+import java.awt.GridLayout;
+import java.awt.FlowLayout;
 
 public class DashboardPanel extends JPanel {
     
-    private JLabel welcomeLabel;
-    private JButton logoutButton;
-    private CardLayout cardLayout;
-    private JPanel mainPanel;
+    private CardLayout cardLayout; 
+    private JPanel mainPanel; 
+    private DatabaseManager dbManager; 
     private Usuario usuarioActual; 
+    
+    // Componentes del Header
+    private JLabel lblUsuario; 
+    private JButton btnCerrarSesion = new JButton("Cerrar Sesión");
 
-    public DashboardPanel(CardLayout cardLayout, JPanel mainPanel) {
-        this.cardLayout = cardLayout;
-        this.mainPanel = mainPanel;
+    // Componentes del Panel 3 (Registro de Productos)
+    private JTextField nombreField = new JTextField(); 
+    private JTextField skuField = new JTextField();
+    private JTextField precioField = new JTextField();
+    private JTextField stockField = new JTextField();
+    private JComboBox<String> categoriaCombo = new JComboBox<>(); 
+    private JTextField materialField = new JTextField();
+    private JComboBox<String> tallaCombo = new JComboBox<>(); 
+    private JTextField colorField = new JTextField();
+    private JComboBox<String> generoCombo = new JComboBox<>(); 
+    private JCheckBox envioGratisCheck = new JCheckBox("Incluir envío gratis"); 
+    private JCheckBox destacadoCheck = new JCheckBox("Marcar como producto destacado"); 
+    private JButton btnGuardarProducto = new JButton("Guardar Producto / Añadir Nuevo"); 
+
+    // Tabla de Inventario (Panel 1)
+    private JTable tablaProductos; 
+    private DefaultTableModel modeloTabla;
+
+    public DashboardPanel(CardLayout layout, JPanel panel, DatabaseManager dbManager) {
+        this.cardLayout = layout;
+        this.mainPanel = panel;
+        this.dbManager = dbManager; 
         
-        setLayout(new BorderLayout(0, 0));
-        setBackground(new Color(240, 240, 240)); 
+        setLayout(new BorderLayout(10, 10));
+        
+        // 1. Inicialización de la UI
+        inicializarHeader();
+        inicializarComponentesRegistro();
+        
+        JTabbedPane panelInferiorLateral = crearPanelOpcionesYRegistro();
+        
+        JPanel centro = new JPanel(new GridLayout(1, 2, 10, 10));
+        
+        // Panel Izquierdo: Inventario + Registro
+        JPanel panelIzquierdo = new JPanel(new BorderLayout(0, 10));
+        panelIzquierdo.add(inicializarPanelInventario(), BorderLayout.NORTH); 
+        panelIzquierdo.add(panelInferiorLateral, BorderLayout.CENTER);
+        
+        centro.add(panelIzquierdo); 
+        
+        // Panel Derecho: Gráficas + Configuración
+        centro.add(crearPanelDerechoPlaceholder()); 
 
-        // A. HEADER (Barra de navegación)
-        JPanel headerPanel = crearHeaderPanel();
+        add(centro, BorderLayout.CENTER);
+        
+        // 2. Conexiones de acción
+        btnGuardarProducto.addActionListener(e -> guardarProductoAction()); 
+        btnCerrarSesion.addActionListener(e -> cerrarSesionAction());
+        
+        setBorder(new EmptyBorder(10, 10, 10, 10));
+    }
+    
+    // --- MÉTODOS DE INICIALIZACIÓN DE UI ---
+
+    private void inicializarComponentesRegistro() {
+        categoriaCombo.addItem("Selecciona categoría");
+        categoriaCombo.addItem("Camisetas");
+        categoriaCombo.addItem("Accesorios");
+        categoriaCombo.addItem("Pantalones");
+        
+        tallaCombo.addItem("S");
+        tallaCombo.addItem("M");
+        tallaCombo.addItem("L");
+        tallaCombo.addItem("XL");
+        
+        generoCombo.addItem("Hombre");
+        generoCombo.addItem("Mujer");
+        generoCombo.addItem("Unisex");
+        
+        precioField.setText("0.00");
+        stockField.setText("0");
+    }
+    
+    private void inicializarHeader() {
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        JLabel titulo = new JLabel("Sistema de Gestión de Inventario", SwingConstants.LEFT);
+        titulo.setFont(new Font("Arial", Font.BOLD, 20));
+        titulo.setBorder(new EmptyBorder(0, 0, 0, 50));
+        
+        lblUsuario = new JLabel("¡Hola, usuario! | Email: - | Teléfono: -"); 
+        lblUsuario.setFont(new Font("Arial", Font.BOLD, 16)); 
+        
+        JPanel userArea = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        userArea.add(lblUsuario); 
+        userArea.add(btnCerrarSesion); 
+        
+        headerPanel.add(titulo, BorderLayout.WEST);
+        headerPanel.add(userArea, BorderLayout.EAST);
         add(headerPanel, BorderLayout.NORTH);
-        
-        // B. CONTENIDO PRINCIPAL (Paneles 1, 2, 3, 4)
-        JPanel contentPanel = crearContentPanel();
-        add(contentPanel, BorderLayout.CENTER);
     }
     
-    // --- MÉTODOS DE CONSTRUCCIÓN DE LA ESTRUCTURA ---
-
-    private JPanel crearHeaderPanel() {
-        JPanel navBar = new JPanel(new BorderLayout());
-        navBar.setBackground(Color.WHITE);
-        navBar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Color.LIGHT_GRAY));
-        navBar.setPreferredSize(new Dimension(10, 40));
-
-        JPanel leftNav = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 5));
-        leftNav.setBackground(Color.WHITE);
-        leftNav.add(new JLabel("Archivo"));
-        leftNav.add(new JLabel("Productos"));
-        leftNav.add(new JLabel("Ventas"));
-        leftNav.add(new JLabel("Recursos Humanos"));
-
-        JPanel rightNav = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 5));
-        rightNav.setBackground(Color.WHITE);
+    private JPanel inicializarPanelInventario() {
+        JPanel panelInventario = new JPanel(new BorderLayout());
+        panelInventario.setBorder(BorderFactory.createTitledBorder("Panel 1: Inventario de Productos")); 
         
-        welcomeLabel = new JLabel("¡Hola, Usuario!"); 
-        welcomeLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        searchPanel.add(new JLabel("Buscar:"));
+        searchPanel.add(new JTextField(20));
+        searchPanel.add(new JButton("Buscar"));
+        panelInventario.add(searchPanel, BorderLayout.NORTH);
         
-        logoutButton = new JButton("Salir");
-        logoutButton.setBackground(new Color(220, 53, 69)); 
-        logoutButton.setForeground(Color.WHITE);
-        logoutButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        logoutButton.addActionListener(e -> cerrarSesion());
-        
-        rightNav.add(welcomeLabel);
-        rightNav.add(logoutButton);
-
-        navBar.add(leftNav, BorderLayout.WEST);
-        navBar.add(rightNav, BorderLayout.EAST);
-        
-        return navBar;
-    }
-
-    private JPanel crearContentPanel() {
-        JPanel content = new JPanel(new BorderLayout());
-        content.setBorder(new EmptyBorder(15, 15, 15, 15));
-        content.setBackground(new Color(240, 240, 240));
-
-        JPanel panelInventario = crearPanelInventario(); // Panel 1
-        JPanel panelLateral = crearPanelLateral();      // Contiene Paneles 2, 3 y 4
-
-        JSplitPane splitH = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, panelInventario, panelLateral);
-        splitH.setResizeWeight(0.65);
-        splitH.setDividerSize(10);
-        splitH.setBorder(null);
-
-        content.add(splitH, BorderLayout.CENTER);
-        return content;
-    }
-    
-    // Panel 1: Inventario
-    private JPanel crearPanelInventario() {
-        JPanel panel = new JPanel(new BorderLayout(0, 10));
-        panel.setBackground(Color.WHITE);
-        panel.setBorder(new TitledBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY), 
-                                        "Panel 1: Inventario de Productos", TitledBorder.LEFT, TitledBorder.TOP, 
-                                        new Font("Arial", Font.BOLD, 14), Color.DARK_GRAY));
-        
-        // Simulación de la barra de búsqueda
-        JPanel searchBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
-        searchBar.add(new JLabel("Buscar:"));
-        searchBar.add(new JTextField(30));
-        searchBar.add(new JButton("Buscar"));
-        panel.add(searchBar, BorderLayout.NORTH);
-
-        // Tabla de Inventario
-        String[] columnNames = {"SKU", "Producto", "Talla", "Color", "Stock", "Precio (90)", "Estado", "Acciones"};
-        Object[][] data = {
-            {"CA0001", "Básica Blanca", "M", "Blanco", 45, "19.99", "Disponible", "Ver / Editar"},
-            {"CA0002", "Básica Negra", "L", "Negro", 38, "19.99", "Disponible", "Ver / Editar"},
-            {"CA0007", "Polo Verde", "M", "Verde", 0, "32.99", "Agotado", "Ver / Editar"}
+        String[] columnas = {"SKU", "Producto", "Talla", "Color", "Stock", "Precio (RD$)", "Estado", "Acciones"};
+        modeloTabla = new DefaultTableModel(columnas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) { return false; }
         };
-        JTable table = new JTable(data, columnNames);
-        table.getTableHeader().setBackground(new Color(240, 240, 255));
+        tablaProductos = new JTable(modeloTabla);
         
-        JScrollPane scrollTable = new JScrollPane(table);
-
-        // JSplitPane Vertical para la tabla y el Registro (Panel 3)
-        JPanel panelRegistro = crearPanelRegistro();
-        JSplitPane splitV = new JSplitPane(JSplitPane.VERTICAL_SPLIT, scrollTable, panelRegistro);
-        splitV.setResizeWeight(0.5); // 50% para cada uno
-        splitV.setDividerSize(10);
-        splitV.setBorder(null);
-        
-        panel.add(splitV, BorderLayout.CENTER);
-        
-        return panel;
-    }
-
-    // Área derecha (Paneles 2 y 4)
-    private JPanel crearPanelLateral() {
-        JPanel panel = new JPanel(new BorderLayout(0, 10));
-        panel.setBackground(new Color(240, 240, 240));
-
-        JPanel panelEstadisticas = crearPanelEstadisticas(); // Panel 2
-        JPanel panelConfiguracion = crearPanelConfiguracion(); // Panel 4
-        
-        JSplitPane splitV = new JSplitPane(JSplitPane.VERTICAL_SPLIT, panelEstadisticas, panelConfiguracion);
-        splitV.setResizeWeight(0.5); 
-        splitV.setDividerSize(10);
-        splitV.setBorder(null);
-
-        panel.add(splitV, BorderLayout.CENTER);
-        return panel;
+        panelInventario.add(new JScrollPane(tablaProductos), BorderLayout.CENTER);
+        panelInventario.setPreferredSize(new java.awt.Dimension(500, 250));
+        return panelInventario;
     }
     
-    // Panel 2: Estadísticas y Gráficas
-    private JPanel crearPanelEstadisticas() {
-        JPanel panel = new JPanel(new BorderLayout(5, 5));
-        panel.setBorder(new TitledBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY), 
-                                        "Panel 2: Estadísticas y Gráficas", TitledBorder.LEFT, TitledBorder.TOP, 
-                                        new Font("Arial", Font.BOLD, 14), Color.DARK_GRAY));
-        panel.setBackground(Color.WHITE);
+    private JTabbedPane crearPanelOpcionesYRegistro() {
+        JTabbedPane tabbedPane = new JTabbedPane(); 
+        tabbedPane.setFont(new Font("Arial", Font.BOLD, 12));
         
-        // Tarjetas de Métricas (GridLayout 1x3)
-        JPanel metricsPanel = new JPanel(new GridLayout(1, 3, 10, 10));
-        metricsPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
-        metricsPanel.setBackground(Color.WHITE);
+        tabbedPane.addTab("Panel 3: Registro de Productos", crearPanelRegistro()); 
+        tabbedPane.addTab("Panel 4: Configuración del Sistema", crearPanelConfiguracionPlaceholder()); 
         
-        metricsPanel.add(crearTarjetaStat("Total Ventas", "1,216", new Color(230, 242, 255), "0.5% vs mes anterior")); 
-        metricsPanel.add(crearTarjetaStat("Ingresos", "€24,310", new Color(230, 255, 230), "4.2% vs mes anterior"));
-        metricsPanel.add(crearTarjetaStat("Productos en Stock", "183", new Color(255, 240, 230), "Ver stock bajo"));
-        
-        panel.add(metricsPanel, BorderLayout.NORTH);
-
-        // Área de Gráficos (GridLayout 1x2)
-        JPanel graphArea = new JPanel(new GridLayout(1, 2, 10, 10));
-        graphArea.setBorder(new EmptyBorder(0, 10, 10, 10));
-        graphArea.add(crearSimulacionGrafico("Evolución de Ventas"));
-        graphArea.add(crearSimulacionGrafico("Ventas por Talla"));
-        
-        panel.add(graphArea, BorderLayout.CENTER);
-
-        return panel;
+        return tabbedPane;
     }
     
-    // Panel 3: Estructura de Registro/Detalles del Producto (Parte del Split Vertical del Panel 1)
     private JPanel crearPanelRegistro() {
-        JPanel panel = new JPanel(new BorderLayout(5, 5));
-        panel.setBorder(new TitledBorder("Panel 3: Registro de Productos"));
-        panel.setBackground(Color.WHITE);
-
-        // Usamos EmptyBorder solo para espacio interior
+        JPanel panel = new JPanel(new BorderLayout(5, 5)); 
+        panel.setBorder(new EmptyBorder(10, 10, 10, 10));
+        
         JPanel form = new JPanel(new GridLayout(0, 2, 10, 5));
-        form.setBorder(new EmptyBorder(10, 10, 10, 10));
-        form.setBackground(Color.WHITE);
         
-        // Campos de información
         form.add(new JLabel("Nombre del Producto:"));
-        form.add(new JTextField("Camiseta Básica Azul"));
+        form.add(nombreField);
+        
         form.add(new JLabel("Código SKU:"));
-        form.add(new JTextField("CA0001"));
-        form.add(new JLabel("Precio (90):"));
-        form.add(new JTextField("19.99"));
+        form.add(skuField);
+        
         form.add(new JLabel("Cantidad en Stock:"));
-        form.add(new JTextField("50"));
+        form.add(stockField);
+        
+        form.add(new JLabel("Precio (RD$):"));
+        form.add(precioField);
+        
         form.add(new JLabel("Categoría:"));
-        form.add(new JComboBox<>(new String[]{"Selecciona categoría", "Carretas", "Accesorios"}));
-
-        // Características y Opciones (al sur del Border Layout principal)
-        JPanel southPanel = new JPanel(new GridLayout(1, 2, 10, 10));
-        southPanel.setBackground(Color.WHITE);
+        form.add(categoriaCombo);
         
-        JTextArea caracteristicas = new JTextArea("Material: 100% Algodón\nGénero: Hombre/Mujer/Unisex");
-        caracteristicas.setBorder(new TitledBorder("Características"));
-        JScrollPane scrollCaract = new JScrollPane(caracteristicas);
+        form.add(new JLabel("Material:"));
+        form.add(materialField);
         
-        JPanel opciones = new JPanel(new GridLayout(2, 1));
-        opciones.setBorder(new TitledBorder("Opciones Adicionales"));
-        opciones.add(new JCheckBox("Incluir envío gratis"));
-        opciones.add(new JCheckBox("Marcar como producto destacado"));
+        form.add(new JLabel("Talla:"));
+        form.add(tallaCombo);
         
-        southPanel.add(scrollCaract);
-        southPanel.add(opciones);
+        form.add(new JLabel("Color:"));
+        form.add(colorField);
+        
+        form.add(new JLabel("Género:"));
+        form.add(generoCombo);
+        
+        JPanel opcionesAdicionales = new JPanel(new GridLayout(2, 1));
+        opcionesAdicionales.setBorder(BorderFactory.createTitledBorder("Opciones Adicionales"));
+        opcionesAdicionales.add(envioGratisCheck); 
+        opcionesAdicionales.add(destacadoCheck); 
         
         panel.add(form, BorderLayout.NORTH);
-        panel.add(southPanel, BorderLayout.CENTER);
+        panel.add(opcionesAdicionales, BorderLayout.CENTER);
+        panel.add(btnGuardarProducto, BorderLayout.SOUTH);
         
         return panel;
     }
-
-    // Panel 4: Configuración del Sistema
-    private JPanel crearPanelConfiguracion() {
-        JPanel panel = new JPanel(new BorderLayout(5, 5));
-        panel.setBorder(new TitledBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY), 
-                                        "Panel 4: Configuración del Sistema", TitledBorder.LEFT, TitledBorder.TOP, 
-                                        new Font("Arial", Font.BOLD, 14), Color.DARK_GRAY));
-        panel.setBackground(Color.WHITE);
-
-        JPanel content = new JPanel();
-        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
-        content.setBorder(new EmptyBorder(10, 10, 10, 10));
-        content.setBackground(Color.WHITE);
-
-        // Opciones de Envío
-        content.add(new JLabel("Opciones de Envío:"));
-        content.add(new JRadioButton("Envío Estándar (3-5 días) - €5.99"));
-        content.add(new JRadioButton("Envío Express (24-48h) - €8.99"));
-        content.add(new JRadioButton("Envío gratis (pedidos > €50)"));
-
-        // Notificaciones y Alertas
-        content.add(Box.createVerticalStrut(15));
-        content.add(new JLabel("Notificaciones y Alertas:"));
-        content.add(new JCheckBox("Alertas de Stock: Recibir notificaciones cuando el stock está bajo"));
-        content.add(new JCheckBox("Alertas de Ventas: Notificar cada nueva venta realizada"));
-
-        // Métodos de Pago
-        content.add(Box.createVerticalStrut(15));
-        content.add(new JLabel("Métodos de Pago Aceptados:"));
-        content.add(new JCheckBox("Tarjeta de Crédito/Débito"));
-        content.add(new JCheckBox("PayPal"));
+    
+    private JPanel crearPanelConfiguracionPlaceholder() {
+        // Contenido de la pestaña de Configuración
+        JPanel panel = new JPanel(new GridLayout(0, 1, 5, 5));
+        panel.setBorder(new EmptyBorder(10, 10, 10, 10));
+        panel.add(new JLabel("Opciones de Envío:"));
+        panel.add(new JRadioButton("Envío Estándar (3-5 días)"));
+        panel.add(new JRadioButton("Envío Express (24-48h)"));
+        panel.add(new JRadioButton("Envío gratis (pedidos > €50)"));
         
-        panel.add(new JScrollPane(content), BorderLayout.CENTER);
+        panel.add(new JLabel("Notificaciones y Alertas:"));
+        panel.add(new JCheckBox("Alertas de Stock: Recibir notificaciones cuando el stock esté bajo"));
+        panel.add(new JCheckBox("Alertas de Ventas: Notificar cada nueva venta realizada"));
+        
+        panel.add(new JLabel("Métodos de Pago Aceptados:"));
+        panel.add(new JCheckBox("Tarjeta de Crédito/Débito"));
+        panel.add(new JCheckBox("PayPal"));
+        
         return panel;
     }
     
-    // --- MÉTODOS AUXILIARES DE DISEÑO ---
-    
-    private JPanel crearTarjetaStat(String titulo, String valor, Color color, String subtitulo) {
-        JPanel tarjeta = new JPanel(new BorderLayout());
-        tarjeta.setBackground(color);
-        tarjeta.setBorder(BorderFactory.createLineBorder(Color.GRAY));
+    private JPanel crearPanelDerechoPlaceholder() {
+        JPanel panelDerecho = new JPanel(new GridLayout(2, 1, 10, 10)); 
         
-        JLabel title = new JLabel(titulo);
-        title.setFont(new Font("Arial", Font.PLAIN, 12));
-        title.setBorder(new EmptyBorder(5, 5, 0, 5));
+        JPanel panelEstadisticas = new JPanel(new BorderLayout());
+        panelEstadisticas.setBorder(BorderFactory.createTitledBorder("Panel 2: Estadísticas y Gráficas")); 
+        panelEstadisticas.add(new JLabel("<< Simulación de Gráficas de Ventas >>", SwingConstants.CENTER), BorderLayout.CENTER);
         
-        JLabel value = new JLabel(valor);
-        value.setFont(new Font("Arial", Font.BOLD, 24));
+        JPanel panelConfiguracion = new JPanel(new BorderLayout());
+        panelConfiguracion.setBorder(BorderFactory.createTitledBorder("Panel 4: Configuración del Sistema"));
+        panelConfiguracion.add(new JLabel("<< Gráficos y Opciones de Configuración >>", SwingConstants.CENTER), BorderLayout.CENTER);
         
-        JLabel subtitle = new JLabel(subtitulo);
-        subtitle.setFont(new Font("Arial", Font.PLAIN, 10));
-        subtitle.setForeground(Color.DARK_GRAY);
-        subtitle.setBorder(new EmptyBorder(0, 5, 5, 5));
+        panelDerecho.add(panelEstadisticas);
+        panelDerecho.add(panelConfiguracion);
         
-        JPanel centerPanel = new JPanel(new BorderLayout());
-        centerPanel.setBackground(color);
-        centerPanel.add(value, BorderLayout.NORTH);
-        centerPanel.add(subtitle, BorderLayout.SOUTH);
-        
-        tarjeta.add(title, BorderLayout.NORTH);
-        tarjeta.add(centerPanel, BorderLayout.CENTER);
-        
-        return tarjeta;
+        return panelDerecho;
     }
 
-    private JPanel crearSimulacionGrafico(String titulo) {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBorder(new TitledBorder(titulo));
-        panel.setBackground(new Color(250, 250, 250));
-        panel.add(new JLabel("<< Simulando Gráfico >>", SwingConstants.CENTER), BorderLayout.CENTER);
-        return panel;
-    }
 
-    // --- MÉTODOS DE SESIÓN ---
-    
+    // --- LÓGICA DE DATOS Y ACCIONES ---
+
     public void cargarDatosUsuario(Usuario usuario) {
         this.usuarioActual = usuario;
         if (usuario != null) {
-            welcomeLabel.setText("¡Hola, " + usuario.getNombre() + "! (" + usuario.getEmail() + ")");
+            lblUsuario.setText("¡Hola, " + usuario.getNombre() + "! | Email: " + usuario.getEmail() + " | Teléfono: " + usuario.getTelefono()); 
+        }
+        actualizarTablaInventario();
+    }
+    
+    public void actualizarTablaInventario() {
+        List<Producto> productos = dbManager.obtenerTodosProductos(); 
+
+        modeloTabla.setRowCount(0);
+
+        for (Producto p : productos) {
+            String estado = (p.getStock() > 0) ? "Disponible" : "Agotado";
+            
+            Object[] fila = new Object[]{
+                p.getSku(),
+                p.getNombre(),
+                p.getTalla(),
+                p.getColor(),
+                p.getStock(),
+                p.getPrecio(),
+                estado,
+                "Ver / Editar" 
+            };
+            modeloTabla.addRow(fila);
+        }
+    }
+
+    private void guardarProductoAction() {
+        try {
+            // 1. Recoger datos y validar (maneja comas y puntos en el precio)
+            String nombre = nombreField.getText().trim();
+            String sku = skuField.getText().trim();
+            double precio = Double.parseDouble(precioField.getText().trim().replace(",", ".")); 
+            int stock = Integer.parseInt(stockField.getText().trim());
+            String categoria = (String) categoriaCombo.getSelectedItem();
+            String material = materialField.getText().trim();
+            String talla = (String) tallaCombo.getSelectedItem();
+            String color = colorField.getText().trim();
+            String genero = (String) generoCombo.getSelectedItem();
+            boolean envioGratis = envioGratisCheck.isSelected();
+            boolean destacado = destacadoCheck.isSelected();
+            
+            if (nombre.isEmpty() || sku.isEmpty() || categoria.contains("Selecciona")) {
+                JOptionPane.showMessageDialog(this, "Por favor, complete los campos obligatorios (Nombre, SKU, Categoría).", "Error de Validación", JOptionPane.ERROR_MESSAGE); 
+                return;
+            }
+
+            // 2. Crear Producto y Guardar
+            Producto nuevoProducto = new Producto(
+                nombre, sku, precio, stock, categoria, material, talla, color, genero, envioGratis, destacado
+            );
+
+            if (dbManager.guardarProducto(nuevoProducto)) { 
+                JOptionPane.showMessageDialog(this, "Producto '" + nombre + "' guardado/actualizado exitosamente.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
+                actualizarTablaInventario(); 
+                limpiarCamposRegistro(); 
+            } else {
+                JOptionPane.showMessageDialog(this, "No se pudo guardar el producto. Verifique los datos o la conexión a la BD.", "Error de Base de Datos", JOptionPane.ERROR_MESSAGE); 
+            }
+
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Error de formato: Asegúrese de que Precio y Stock sean números válidos.", "Error", JOptionPane.ERROR_MESSAGE); 
         }
     }
     
-    private void cerrarSesion() {
-        this.usuarioActual = null;
+    private void limpiarCamposRegistro() {
+        nombreField.setText("");
+        skuField.setText("");
+        precioField.setText("0.00");
+        stockField.setText("0");
+        categoriaCombo.setSelectedIndex(0); 
+        materialField.setText("");
+        tallaCombo.setSelectedIndex(0);
+        colorField.setText("");
+        generoCombo.setSelectedIndex(0);
+        envioGratisCheck.setSelected(false);
+        destacadoCheck.setSelected(false);
+    }
+    
+    private void cerrarSesionAction() {
+        usuarioActual = null;
         cardLayout.show(mainPanel, "LoginPanel");
-        welcomeLabel.setText("¡Hola, Usuario!");
-        
-        JOptionPane.showMessageDialog(this, 
-                "Has cerrado sesión exitosamente.", 
-                "Sesión Terminada", 
-                JOptionPane.INFORMATION_MESSAGE);
     }
 }

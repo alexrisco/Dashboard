@@ -1,104 +1,110 @@
 package com.mycompany.proyectodashboard;
 
-import java.sql.*;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.Random;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 
 public class DatabaseManager {
-    private static final String DB_URL = "jdbc:sqlite:usuarios.db";
-    private Connection connection;
-
+    
+    private static final String URL = "jdbc:sqlite:proyecto_dashboard.db";
+    
     public DatabaseManager() {
         try {
-            // Cargar el driver de SQLite
             Class.forName("org.sqlite.JDBC");
-            connection = DriverManager.getConnection(DB_URL);
-            createTables();
-        } catch (Exception e) {
-            System.err.println("Error al inicializar la base de datos: " + e.getMessage());
+            crearTablas(); 
+        } catch (ClassNotFoundException e) {
+            System.err.println("No se encontró el driver SQLite JDBC.");
             e.printStackTrace();
         }
     }
 
-    // Crear las tablas necesarias
-    private void createTables() {
-        String sqlUsuarios = "CREATE TABLE IF NOT EXISTS usuarios (" +
-                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                "nombre TEXT NOT NULL," +
-                "apellidos TEXT NOT NULL," +
-                "email TEXT UNIQUE NOT NULL," +
-                "telefono TEXT," +
-                "genero TEXT," +
-                "password TEXT NOT NULL," +
-                "fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
-                ")";
+    public Connection conectar() throws SQLException {
+        return DriverManager.getConnection(URL);
+    }
 
-        String sqlCodigosVerificacion = "CREATE TABLE IF NOT EXISTS codigos_verificacion (" +
-                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                "email TEXT NOT NULL," +
-                "codigo TEXT NOT NULL," +
-                "fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
-                "usado INTEGER DEFAULT 0" +
-                ")";
-
-        try (Statement stmt = connection.createStatement()) {
+    public void crearTablas() {
+        // 1. Tabla de Usuarios (Incluye 'genero')
+        String sqlUsuarios = "CREATE TABLE IF NOT EXISTS usuarios (\n"
+                           + "    id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
+                           + "    nombre TEXT NOT NULL,\n"
+                           + "    apellidos TEXT,\n"
+                           + "    email TEXT UNIQUE NOT NULL,\n"
+                           + "    telefono TEXT,\n"
+                           + "    genero TEXT,\n"
+                           + "    password TEXT NOT NULL\n"
+                           + ");";
+        
+        // 2. Tabla de Productos
+        String sqlProductos = "CREATE TABLE IF NOT EXISTS productos (\n"
+                            + "    sku TEXT PRIMARY KEY,\n"
+                            + "    nombre TEXT NOT NULL,\n"
+                            + "    precio REAL NOT NULL,\n"
+                            + "    stock INTEGER NOT NULL,\n"
+                            + "    categoria TEXT,\n"
+                            + "    material TEXT,\n"
+                            + "    talla TEXT,\n"
+                            + "    color TEXT,\n"
+                            + "    genero TEXT,\n"
+                            + "    envioGratis INTEGER DEFAULT 0,\n" 
+                            + "    destacado INTEGER DEFAULT 0\n"     
+                            + ");";
+        
+        // 3. Tabla de Códigos de Verificación
+        String sqlCodigos = "CREATE TABLE IF NOT EXISTS codigos_verificacion (\n"
+                          + "    email TEXT PRIMARY KEY,\n"
+                          + "    codigo TEXT NOT NULL,\n"
+                          + "    expiracion INTEGER NOT NULL\n"
+                          + ");";
+        
+        try (Connection conn = conectar();
+             Statement stmt = conn.createStatement()) {
+            
             stmt.execute(sqlUsuarios);
-            stmt.execute(sqlCodigosVerificacion);
+            stmt.execute(sqlProductos);
+            stmt.execute(sqlCodigos);
         } catch (SQLException e) {
             System.err.println("Error al crear tablas: " + e.getMessage());
         }
     }
 
-    // Encriptar contraseña con SHA-256
-    private String encriptarPassword(String password) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(password.getBytes());
-            StringBuilder hexString = new StringBuilder();
-            for (byte b : hash) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0');
-                hexString.append(hex);
-            }
-            return hexString.toString();
-        } catch (NoSuchAlgorithmException e) {
-            System.err.println("Error de algoritmo de cifrado: " + e.getMessage());
-            return null;
-        }
-    }
-
-    // Registrar nuevo usuario
-    public boolean registrarUsuario(String nombre, String apellidos, String email, 
-                                     String telefono, String genero, String password) {
-        String sql = "INSERT INTO usuarios (nombre, apellidos, email, telefono, genero, password) " +
-                      "VALUES (?, ?, ?, ?, ?, ?)";
-
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+    // --- MÉTODOS DE USUARIO ---
+    
+    public boolean registrarUsuario(String nombre, String apellidos, String email, String telefono, String genero, String password) {
+        String sql = "INSERT INTO usuarios (nombre, apellidos, email, telefono, genero, password) VALUES (?, ?, ?, ?, ?, ?)";
+        try (Connection conn = conectar();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            
             pstmt.setString(1, nombre);
             pstmt.setString(2, apellidos);
             pstmt.setString(3, email);
             pstmt.setString(4, telefono);
             pstmt.setString(5, genero);
-            pstmt.setString(6, encriptarPassword(password));
-            pstmt.executeUpdate();
-            return true;
+            pstmt.setString(6, password); 
+            return pstmt.executeUpdate() > 0;
+            
         } catch (SQLException e) {
-            // Error: probable email duplicado (UNIQUE constraint)
+            System.err.println("Error al registrar usuario: " + e.getMessage());
             return false;
         }
     }
-
-    // Iniciar sesión
+        
     public Usuario iniciarSesion(String email, String password) {
-        String sql = "SELECT * FROM usuarios WHERE email = ? AND password = ?";
+        // SELECT corregido para incluir 'genero'
+        String sql = "SELECT id, nombre, apellidos, email, telefono, genero FROM usuarios WHERE email = ? AND password = ?";
+        try (Connection conn = conectar();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, email);
-            pstmt.setString(2, encriptarPassword(password));
-            ResultSet rs = pstmt.executeQuery();
+            pstmt.setString(2, password);
 
+            ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
+                // Se utiliza el constructor de Usuario con 6 argumentos
                 return new Usuario(
                     rs.getInt("id"),
                     rs.getString("nombre"),
@@ -106,96 +112,157 @@ public class DatabaseManager {
                     rs.getString("email"),
                     rs.getString("telefono"),
                     rs.getString("genero")
+                ); 
+            }
+            return null;
+
+        } catch (SQLException e) {
+            System.err.println("Error de inicio de sesión: " + e.getMessage());
+            return null;
+        }
+    }
+    
+    // --- MÉTODOS DE PRODUCTOS ---
+
+    public boolean guardarProducto(Producto p) {
+        // Usa INSERT OR REPLACE INTO para guardar o actualizar por SKU.
+        String sql = "INSERT OR REPLACE INTO productos ("
+                   + "sku, nombre, precio, stock, categoria, material, talla, color, genero, envioGratis, destacado) "
+                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        try (Connection conn = conectar();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, p.getSku());
+            pstmt.setString(2, p.getNombre());
+            pstmt.setDouble(3, p.getPrecio());
+            pstmt.setInt(4, p.getStock());
+            pstmt.setString(5, p.getCategoria());
+            pstmt.setString(6, p.getMaterial());
+            pstmt.setString(7, p.getTalla());
+            pstmt.setString(8, p.getColor());
+            pstmt.setString(9, p.getGenero());
+            // Convierte boolean a INTEGER (0 o 1)
+            pstmt.setInt(10, p.isEnvioGratis() ? 1 : 0);
+            pstmt.setInt(11, p.isDestacado() ? 1 : 0);
+            
+            return pstmt.executeUpdate() > 0;
+
+        } catch (SQLException e) {
+            System.err.println("Error al guardar producto: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    public List<Producto> obtenerTodosProductos() {
+        String sql = "SELECT * FROM productos";
+        List<Producto> productos = new ArrayList<>();
+        try (Connection conn = conectar();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            while (rs.next()) {
+                Producto p = new Producto(
+                    rs.getString("nombre"),
+                    rs.getString("sku"),
+                    rs.getDouble("precio"),
+                    rs.getInt("stock"),
+                    rs.getString("categoria"),
+                    rs.getString("material"),
+                    rs.getString("talla"),
+                    rs.getString("color"),
+                    rs.getString("genero"),
+                    rs.getInt("envioGratis") == 1,
+                    rs.getInt("destacado") == 1
                 );
+                productos.add(p);
             }
         } catch (SQLException e) {
-            System.err.println("Error en iniciarSesion: " + e.getMessage());
+            System.err.println("Error al obtener productos: " + e.getMessage());
         }
-        return null;
+        return productos;
     }
-
-    // Verificar si el email existe
+    
+    // --- MÉTODOS DE RECUPERACIÓN DE CONTRASEÑA ---
+    
     public boolean emailExiste(String email) {
-        String sql = "SELECT COUNT(*) FROM usuarios WHERE email = ?";
-
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+        String sql = "SELECT count(*) FROM usuarios WHERE email = ?";
+        try (Connection conn = conectar();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            
             pstmt.setString(1, email);
             ResultSet rs = pstmt.executeQuery();
-            return rs.getInt(1) > 0;
+            if (rs.next()) {
+                return rs.getInt(1) > 0;
+            }
         } catch (SQLException e) {
-            System.err.println("Error en emailExiste: " + e.getMessage());
+            System.err.println("Error al verificar email: " + e.getMessage());
         }
         return false;
     }
-
-    // Generar código de verificación
+    
     public String generarCodigoVerificacion(String email) {
-        Random random = new Random();
-        // Genera un código de 6 dígitos con ceros iniciales si es necesario
-        String codigo = String.format("%06d", random.nextInt(1000000));
-
-        String sql = "INSERT INTO codigos_verificacion (email, codigo) VALUES (?, ?)";
-
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+        String codigo = String.valueOf((int)(Math.random() * 9000) + 1000); 
+        long expiracion = System.currentTimeMillis() + (5 * 60 * 1000); // 5 minutos
+        
+        String sql = "INSERT OR REPLACE INTO codigos_verificacion (email, codigo, expiracion) VALUES (?, ?, ?)";
+        try (Connection conn = conectar();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            
             pstmt.setString(1, email);
             pstmt.setString(2, codigo);
-            pstmt.executeUpdate();
-            return codigo;
+            pstmt.setLong(3, expiracion);
+            
+            if (pstmt.executeUpdate() > 0) {
+                return codigo;
+            }
         } catch (SQLException e) {
             System.err.println("Error al generar código: " + e.getMessage());
         }
         return null;
     }
-
-    // Verificar código
+    
     public boolean verificarCodigo(String email, String codigo) {
-        // Busca el código más reciente y no usado para el email
-        String sql = "SELECT id FROM codigos_verificacion WHERE email = ? AND codigo = ? " +
-                     "AND usado = 0 ORDER BY fecha_creacion DESC LIMIT 1";
-
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+        String sql = "SELECT expiracion FROM codigos_verificacion WHERE email = ? AND codigo = ?";
+        try (Connection conn = conectar();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            
             pstmt.setString(1, email);
             pstmt.setString(2, codigo);
+            
             ResultSet rs = pstmt.executeQuery();
-
             if (rs.next()) {
-                // Marcar el código como usado (prevención de reutilización)
-                String updateSql = "UPDATE codigos_verificacion SET usado = 1 WHERE id = ?";
-                try (PreparedStatement updateStmt = connection.prepareStatement(updateSql)) {
-                    updateStmt.setInt(1, rs.getInt("id"));
-                    updateStmt.executeUpdate();
+                long expiracion = rs.getLong("expiracion");
+                if (System.currentTimeMillis() < expiracion) {
+                    return true;
                 }
-                return true;
             }
         } catch (SQLException e) {
             System.err.println("Error al verificar código: " + e.getMessage());
         }
         return false;
     }
-
-    // Cambiar contraseña
+    
     public boolean cambiarPassword(String email, String nuevaPassword) {
         String sql = "UPDATE usuarios SET password = ? WHERE email = ?";
-
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setString(1, encriptarPassword(nuevaPassword));
+        String sqlDeleteCode = "DELETE FROM codigos_verificacion WHERE email = ?";
+        
+        try (Connection conn = conectar();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             PreparedStatement pstmtDelete = conn.prepareStatement(sqlDeleteCode)) {
+            
+            pstmt.setString(1, nuevaPassword);
             pstmt.setString(2, email);
-            int filasAfectadas = pstmt.executeUpdate();
-            return filasAfectadas > 0;
+            int filasActualizadas = pstmt.executeUpdate();
+            
+            pstmtDelete.setString(1, email);
+            pstmtDelete.executeUpdate();
+            
+            return filasActualizadas > 0;
+            
         } catch (SQLException e) {
-            System.err.println("Error al cambiar contraseña: " + e.getMessage());
-        }
-        return false;
-    }
-
-    // Cerrar conexión
-    public void cerrarConexion() {
-        try {
-            if (connection != null && !connection.isClosed()) {
-                connection.close();
-            }
-        } catch (SQLException e) {
-            System.err.println("Error al cerrar conexión: " + e.getMessage());
+            System.err.println("Error al cambiar password: " + e.getMessage());
+            return false;
         }
     }
 }

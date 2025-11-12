@@ -1,114 +1,274 @@
 package com.mycompany.proyectodashboard;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import java.awt.*;
 
+/**
+ * Panel para establecer nueva contraseña con diseño moderno
+ */
 public class NuevaPasswordPanel extends JPanel {
     private JTextField codigoField;
     private JPasswordField nuevaPasswordField;
     private JPasswordField confirmarPasswordField;
-    private JLabel emailLabel;
+    private JLabel emailDisplayLabel;
     private DatabaseManager dbManager;
-    private String emailRecuperacion; // Variable de estado
+    private String emailRecuperacion;
+
+    private static final Color PRIMARY_COLOR = new Color(99, 102, 241);
+    private static final Color PRIMARY_HOVER = new Color(79, 70, 229);
+    private static final Color SUCCESS_COLOR = new Color(34, 197, 94);
+    private static final Color INFO_COLOR = new Color(59, 130, 246);
+    private static final Color BACKGROUND = new Color(249, 250, 251);
+    private static final Color CARD_BG = Color.WHITE;
+    private static final Color TEXT_PRIMARY = new Color(17, 24, 39);
+    private static final Color TEXT_SECONDARY = new Color(107, 114, 128);
+    private static final Color BORDER_COLOR = new Color(229, 231, 235);
 
     public NuevaPasswordPanel(DatabaseManager dbManager, CardLayout cardLayout, JPanel mainPanel) {
         this.dbManager = dbManager;
-        setLayout(new GridBagLayout());
-        setBackground(Color.WHITE);
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(8, 20, 8, 20);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
         
-        // ... [CÓDIGO DE DISEÑO OMITIDO POR BREVEDAD, ES IDÉNTICO AL QUE PASASTE] ...
+        setLayout(new BorderLayout());
+        setBackground(BACKGROUND);
+        
+        JPanel centerWrapper = new JPanel(new GridBagLayout());
+        centerWrapper.setBackground(BACKGROUND);
+        
+        JPanel cardPanel = createNuevaPasswordCard(cardLayout, mainPanel);
+        centerWrapper.add(cardPanel);
+        
+        add(centerWrapper, BorderLayout.CENTER);
+    }
+
+    private JPanel createNuevaPasswordCard(CardLayout cardLayout, JPanel mainPanel) {
+        JPanel card = new JPanel();
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        card.setBackground(CARD_BG);
+        card.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(BORDER_COLOR, 1),
+            new EmptyBorder(40, 45, 40, 45)
+        ));
+        card.setPreferredSize(new Dimension(440, 700));
+
+        // Icono
+        JPanel iconPanel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2d = (Graphics2D) g;
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                
+                GradientPaint gradient = new GradientPaint(
+                    0, 0, new Color(34, 197, 94, 30),
+                    getWidth(), getHeight(), new Color(99, 102, 241, 30)
+                );
+                g2d.setPaint(gradient);
+                g2d.fillOval(15, 5, 70, 70);
+            }
+        };
+        iconPanel.setLayout(new FlowLayout(FlowLayout.CENTER));
+        iconPanel.setBackground(CARD_BG);
+        iconPanel.setMaximumSize(new Dimension(440, 90));
+        
+        JLabel iconLabel = new JLabel("✉️");
+        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 42));
+        iconPanel.add(iconLabel);
+        
+        card.add(iconPanel);
+        card.add(Box.createVerticalStrut(15));
 
         // Título
-        JLabel titleLabel = new JLabel("Nueva Contraseña", SwingConstants.CENTER);
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 20));
-        gbc.gridy = 1;
-        gbc.gridx = 0;
-        gbc.gridwidth = 2;
-        add(titleLabel, gbc);
+        JLabel titleLabel = new JLabel("Nueva Contraseña");
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 30));
+        titleLabel.setForeground(TEXT_PRIMARY);
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        card.add(titleLabel);
+        card.add(Box.createVerticalStrut(25));
 
         // Panel de mensaje de código enviado
         JPanel mensajePanel = new JPanel();
         mensajePanel.setLayout(new BoxLayout(mensajePanel, BoxLayout.Y_AXIS));
         mensajePanel.setBackground(new Color(220, 252, 231));
-        mensajePanel.setBorder(BorderFactory.createLineBorder(new Color(134, 239, 172), 2));
-        mensajePanel.setPreferredSize(new Dimension(280, 50));
+        mensajePanel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(134, 239, 172), 2, true),
+            new EmptyBorder(14, 16, 14, 16)
+        ));
+        mensajePanel.setMaximumSize(new Dimension(350, 75));
 
-        JLabel mensajeLabel = new JLabel("✓ Se ha enviado un código de verificación a");
-        emailLabel = new JLabel("tu@email.com"); // Este label se actualizará con setEmail()
+        JLabel mensajeLabel = new JLabel("✓ Código enviado a:");
+        mensajeLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        mensajeLabel.setForeground(new Color(21, 128, 61));
+        mensajeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        
+        emailDisplayLabel = new JLabel("tu@email.com");
+        emailDisplayLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        emailDisplayLabel.setForeground(new Color(21, 128, 61));
+        emailDisplayLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        mensajePanel.add(Box.createVerticalGlue());
         mensajePanel.add(mensajeLabel);
-        mensajePanel.add(emailLabel);
-        mensajePanel.add(Box.createVerticalGlue());
-        gbc.gridy = 3;
-        add(mensajePanel, gbc);
+        mensajePanel.add(Box.createVerticalStrut(5));
+        mensajePanel.add(emailDisplayLabel);
+        
+        card.add(mensajePanel);
+        card.add(Box.createVerticalStrut(28));
 
         // Código de verificación
-        JLabel codigoLabel = new JLabel("Código de verificación");
-        gbc.gridy = 5;
-        add(codigoLabel, gbc);
-        codigoField = new JTextField();
-        codigoField.setPreferredSize(new Dimension(280, 35));
-        gbc.gridy = 6;
-        add(codigoField, gbc);
+        card.add(createFieldLabel("Código de verificación"));
+        card.add(Box.createVerticalStrut(8));
+        codigoField = createStyledTextField("000000");
+        card.add(codigoField);
+        card.add(Box.createVerticalStrut(18));
 
         // Nueva contraseña
-        JLabel nuevaPasswordLabel = new JLabel("Nueva contraseña");
-        gbc.gridy = 7;
-        add(nuevaPasswordLabel, gbc);
-        nuevaPasswordField = new JPasswordField();
-        nuevaPasswordField.setPreferredSize(new Dimension(280, 35));
-        gbc.gridy = 8;
-        add(nuevaPasswordField, gbc);
+        card.add(createFieldLabel("Nueva contraseña"));
+        card.add(Box.createVerticalStrut(8));
+        nuevaPasswordField = createStyledPasswordField();
+        card.add(nuevaPasswordField);
+        card.add(Box.createVerticalStrut(18));
 
         // Confirmar contraseña
-        JLabel confirmarLabel = new JLabel("Confirmar nueva contraseña");
-        gbc.gridy = 9;
-        add(confirmarLabel, gbc);
-        confirmarPasswordField = new JPasswordField();
-        confirmarPasswordField.setPreferredSize(new Dimension(280, 35));
-        gbc.gridy = 10;
-        add(confirmarPasswordField, gbc);
+        card.add(createFieldLabel("Confirmar nueva contraseña"));
+        card.add(Box.createVerticalStrut(8));
+        confirmarPasswordField = createStyledPasswordField();
+        card.add(confirmarPasswordField);
+        card.add(Box.createVerticalStrut(28));
 
         // Botón Cambiar Contraseña
-        JButton cambiarButton = new JButton("Cambiar Contraseña");
-        cambiarButton.setPreferredSize(new Dimension(280, 40));
-        cambiarButton.setBackground(new Color(139, 92, 246));
-        cambiarButton.setForeground(Color.WHITE);
-        cambiarButton.setBorderPainted(false);
-        cambiarButton.setFocusPainted(false);
-        cambiarButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        JButton cambiarButton = createPrimaryButton("Cambiar Contraseña");
         cambiarButton.addActionListener(e -> cambiarPassword(cardLayout, mainPanel));
-        gbc.gridy = 11;
-        add(cambiarButton, gbc);
+        card.add(cambiarButton);
+        card.add(Box.createVerticalStrut(25));
 
-        // Link cambiar email (Redirección a RecuperarPanel)
-        JPanel cambiarEmailPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        cambiarEmailPanel.setBackground(Color.WHITE);
-        JLabel cambiarEmailLabel = new JLabel("← Cambiar email");
-        cambiarEmailLabel.setForeground(new Color(59, 130, 246));
+        // Separador
+        card.add(createSeparator());
+        card.add(Box.createVerticalStrut(25));
+
+        // Link cambiar email
+        JLabel cambiarEmailLabel = new JLabel("← Usar otro email");
+        cambiarEmailLabel.setForeground(INFO_COLOR);
+        cambiarEmailLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         cambiarEmailLabel.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        cambiarEmailLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         cambiarEmailLabel.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent evt) {
+                limpiarCampos();
                 cardLayout.show(mainPanel, "RecuperarPanel");
             }
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                cambiarEmailLabel.setText("<html><u>← Usar otro email</u></html>");
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                cambiarEmailLabel.setText("← Usar otro email");
+            }
         });
-        cambiarEmailPanel.add(cambiarEmailLabel);
-        gbc.gridy = 12;
-        add(cambiarEmailPanel, gbc);
+        card.add(cambiarEmailLabel);
 
-        // Simulación de diseño inicial completa
+        return card;
     }
 
-    /**
-     * Settea el email desde RecuperarPanel para saber a qué usuario cambiar la contraseña.
-     */
+    private JLabel createFieldLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        label.setForeground(TEXT_PRIMARY);
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
+        label.setMaximumSize(new Dimension(350, 22));
+        return label;
+    }
+
+    private JTextField createStyledTextField(String placeholder) {
+        JTextField field = new JTextField();
+        field.setPreferredSize(new Dimension(350, 44));
+        field.setMaximumSize(new Dimension(350, 44));
+        field.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        field.setForeground(TEXT_PRIMARY);
+        field.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(BORDER_COLOR, 1, true),
+            BorderFactory.createEmptyBorder(8, 14, 8, 14)
+        ));
+        
+        field.addFocusListener(new java.awt.event.FocusAdapter() {
+            public void focusGained(java.awt.event.FocusEvent evt) {
+                field.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(PRIMARY_COLOR, 2, true),
+                    BorderFactory.createEmptyBorder(7, 13, 7, 13)
+                ));
+            }
+            public void focusLost(java.awt.event.FocusEvent evt) {
+                field.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(BORDER_COLOR, 1, true),
+                    BorderFactory.createEmptyBorder(8, 14, 8, 14)
+                ));
+            }
+        });
+        
+        return field;
+    }
+
+    private JPasswordField createStyledPasswordField() {
+        JPasswordField field = new JPasswordField();
+        field.setPreferredSize(new Dimension(350, 44));
+        field.setMaximumSize(new Dimension(350, 44));
+        field.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        field.setForeground(TEXT_PRIMARY);
+        field.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(BORDER_COLOR, 1, true),
+            BorderFactory.createEmptyBorder(8, 14, 8, 14)
+        ));
+        
+        field.addFocusListener(new java.awt.event.FocusAdapter() {
+            public void focusGained(java.awt.event.FocusEvent evt) {
+                field.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(PRIMARY_COLOR, 2, true),
+                    BorderFactory.createEmptyBorder(7, 13, 7, 13)
+                ));
+            }
+            public void focusLost(java.awt.event.FocusEvent evt) {
+                field.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(BORDER_COLOR, 1, true),
+                    BorderFactory.createEmptyBorder(8, 14, 8, 14)
+                ));
+            }
+        });
+        
+        return field;
+    }
+
+    private JButton createPrimaryButton(String text) {
+        JButton button = new JButton(text);
+        button.setPreferredSize(new Dimension(350, 48));
+        button.setMaximumSize(new Dimension(350, 48));
+        button.setBackground(PRIMARY_COLOR);
+        button.setForeground(Color.WHITE);
+        button.setFont(new Font("Segoe UI", Font.BOLD, 15));
+        button.setBorderPainted(false);
+        button.setFocusPainted(false);
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        button.setAlignmentX(Component.CENTER_ALIGNMENT);
+        
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                button.setBackground(PRIMARY_HOVER);
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                button.setBackground(PRIMARY_COLOR);
+            }
+        });
+        
+        return button;
+    }
+
+    private JPanel createSeparator() {
+        JPanel panel = new JPanel();
+        panel.setBackground(CARD_BG);
+        panel.setMaximumSize(new Dimension(350, 1));
+        panel.setPreferredSize(new Dimension(350, 1));
+        panel.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, BORDER_COLOR));
+        return panel;
+    }
+
     public void setEmail(String email) {
         this.emailRecuperacion = email;
-        emailLabel.setText(email);
+        emailDisplayLabel.setText(email);
     }
 
     private void cambiarPassword(CardLayout cardLayout, JPanel mainPanel) {
@@ -116,67 +276,55 @@ public class NuevaPasswordPanel extends JPanel {
         String nuevaPassword = new String(nuevaPasswordField.getPassword());
         String confirmarPassword = new String(confirmarPasswordField.getPassword());
 
-        // Validaciones
         if (emailRecuperacion == null || emailRecuperacion.isEmpty()) {
-            JOptionPane.showMessageDialog(this, 
-                "Error: No se ha iniciado el proceso de recuperación.", 
-                "Error de Flujo", 
-                JOptionPane.ERROR_MESSAGE);
+            mostrarError("Error: No se ha iniciado el proceso de recuperación.\nPor favor, vuelve al paso anterior.");
             cardLayout.show(mainPanel, "RecuperarPanel");
             return;
         }
 
         if (codigo.isEmpty() || nuevaPassword.isEmpty() || confirmarPassword.isEmpty()) {
-            JOptionPane.showMessageDialog(this, 
-                "Por favor, completa todos los campos", 
-                "Error", 
-                JOptionPane.ERROR_MESSAGE);
+            mostrarError("Por favor, completa todos los campos");
             return;
         }
 
         if (!nuevaPassword.equals(confirmarPassword)) {
-            JOptionPane.showMessageDialog(this, 
-                "Las contraseñas no coinciden", 
-                "Error", 
-                JOptionPane.ERROR_MESSAGE);
+            mostrarError("Las contraseñas no coinciden");
             return;
         }
 
         if (nuevaPassword.length() < 6) {
-            JOptionPane.showMessageDialog(this, 
-                "La contraseña debe tener al menos 6 caracteres", 
-                "Error", 
-                JOptionPane.ERROR_MESSAGE);
+            mostrarError("La contraseña debe tener al menos 6 caracteres");
             return;
         }
 
-        // 1. Verificar el código en la base de datos
         if (!dbManager.verificarCodigo(emailRecuperacion, codigo)) {
-            JOptionPane.showMessageDialog(this, 
-                "Código de verificación incorrecto o expirado", 
-                "Error", 
-                JOptionPane.ERROR_MESSAGE);
+            mostrarError("Código de verificación incorrecto o ya usado");
             return;
         }
 
-        // 2. Cambiar la contraseña
         if (dbManager.cambiarPassword(emailRecuperacion, nuevaPassword)) {
             JOptionPane.showMessageDialog(this, 
-                "¡Contraseña cambiada exitosamente!\nYa puedes iniciar sesión con tu nueva contraseña", 
+                "¡Contraseña cambiada exitosamente!\n\n" +
+                "Ya puedes iniciar sesión con tu nueva contraseña", 
                 "Éxito", 
                 JOptionPane.INFORMATION_MESSAGE);
             
-            // Limpiar campos y volver al login
-            codigoField.setText("");
-            nuevaPasswordField.setText("");
-            confirmarPasswordField.setText("");
-            
+            limpiarCampos();
             cardLayout.show(mainPanel, "LoginPanel");
         } else {
-            JOptionPane.showMessageDialog(this, 
-                "Error al cambiar la contraseña", 
-                "Error", 
-                JOptionPane.ERROR_MESSAGE);
+            mostrarError("Error al cambiar la contraseña.\nPor favor, inténtalo de nuevo.");
         }
+    }
+
+    private void mostrarError(String mensaje) {
+        JOptionPane.showMessageDialog(this, mensaje, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+
+    private void limpiarCampos() {
+        codigoField.setText("");
+        nuevaPasswordField.setText("");
+        confirmarPasswordField.setText("");
+        emailRecuperacion = null;
+        emailDisplayLabel.setText("tu@email.com");
     }
 }
